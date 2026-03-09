@@ -1,6 +1,6 @@
 module aes128_top_avalon (
     input  wire        clk,
-    input  wire        reset_n,  // Active-low reset chuẩn Avalon
+    input  wire        reset_n,  // Active-low reset 
 
     // Avalon-MM Slave Interface
     input  wire        avs_write,
@@ -63,3 +63,4 @@ module aes128_top_avalon (
     end
 
 endmodule
+
