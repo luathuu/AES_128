@@ -1,0 +1,160 @@
+#include <stdio.h>
+#include <stdint.h>
+#include "system.h"
+#include "io.h"
+
+#define AES_BASE  AES_CORE_0_BASE
+#define WORD_TO_BYTE(w) ((w) * 4)
+
+enum {
+    KEY_WORD0   = 0,
+    PLAIN_WORD0 = 4,
+    START_WORD  = 8
+};
+
+static void write_u32s(uint32_t base, int word_idx, const uint32_t *v) {
+    int i;
+    for (i = 0; i < 4; ++i) {
+        IOWR_32DIRECT(base, WORD_TO_BYTE(word_idx + i), v[i]);
+    }
+}
+
+static void read_u32s(uint32_t base, int word_idx, uint32_t *v) {
+    int i;
+    for (i = 0; i < 4; ++i) {
+        v[i] = IORD_32DIRECT(base, WORD_TO_BYTE(word_idx + i));
+    }
+}
+
+static inline void write_start(uint32_t base, uint8_t v) {
+    IOWR_32DIRECT(base, WORD_TO_BYTE(START_WORD), (uint32_t)(v & 1u));
+}
+
+void aes_encrypt(const uint32_t key[4], const uint32_t pt[4], uint32_t ct[4]) {
+    write_u32s(AES_BASE, KEY_WORD0, key);
+    write_u32s(AES_BASE, PLAIN_WORD0, pt);
+    write_start(AES_BASE, 1);
+    write_start(AES_BASE, 0);
+    read_u32s(AES_BASE, KEY_WORD0, ct);
+}
+
+int main(void) {
+    const uint32_t keys[40][4] = {
+        {0x2b7e1516, 0x28aed2a6, 0xabf71588, 0x09cf4f3c},
+        {0x00010203, 0x04050607, 0x08090a0b, 0x0c0d0e0f},
+        {0x11111111, 0x11111111, 0x11111111, 0x11111111},
+        {0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF},
+        {0xA56BABCD, 0x12345678, 0xDEADBEEF, 0x0BADF00D},
+        {0xCAFEBABE, 0xDEADC0DE, 0xFEEDFACE, 0xBAADF00D},
+        {0x00000000, 0x00000000, 0x00000000, 0x00000000},
+        {0x01020304, 0x05060708, 0x090A0B0C, 0x0D0E0F10},
+        {0xABCDEF12, 0x34567890, 0x11223344, 0x55667788},
+        {0xDEADC0DE, 0xDEADC0DE, 0xDEADC0DE, 0xDEADC0DE},
+
+        {0x12345678, 0x9abcdef0, 0x13579bdf, 0x2468ace0},
+        {0x0f1e2d3c, 0x4b5a6978, 0x8697a5b4, 0xc3d2e1f0},
+        {0xdeadbeef, 0xcafebabe, 0xfeedface, 0x8badf00d},
+        {0x01010101, 0x02020202, 0x03030303, 0x04040404},
+        {0xabcdef01, 0x23456789, 0x87654321, 0x0fedcba9},
+        {0x55555555, 0xaaaaaaaa, 0x33333333, 0xcccccccc},
+        {0xdeadbeef, 0x00000000, 0xffffffff, 0x12345678},
+        {0x0a0b0c0d, 0x1e1f2021, 0x2a2b2c2d, 0x3e3f4041},
+        {0x11111111, 0x22222222, 0x33333333, 0x44444444},
+        {0x99999999, 0x88888888, 0x77777777, 0x66666666},
+
+        {0xffffffff, 0x00000000, 0xffffffff, 0x00000000},
+        {0x01234567, 0x89abcdef, 0xfedcba98, 0x76543210},
+        {0xabcdefab, 0xcdefabcd, 0xefabcdef, 0xfabcdefa},
+        {0x0f0f0f0f, 0xf0f0f0f0, 0x0f0f0f0f, 0xf0f0f0f0},
+        {0x12341234, 0x56785678, 0x9abc9abc, 0xdef0def0},
+        {0xdeadbeef, 0xbeadfeed, 0xfaceb00c, 0xcafef00d},
+        {0x11112222, 0x33334444, 0x55556666, 0x77778888},
+        {0x0000ffff, 0xffff0000, 0x00ff00ff, 0xff00ff00},
+        {0xabcdef01, 0x23456789, 0x87654321, 0x0fedcba9},
+        {0x11111111, 0x22222222, 0x33333333, 0x44444444},
+
+        {0x0a0a0a0a, 0x1b1b1b1b, 0x2c2c2c2c, 0x3d3d3d3d},
+        {0xabcdefab, 0xcdefabcd, 0xefabcdef, 0xfabcdefa},
+        {0xdeadbeef, 0xcafebabe, 0xfeedface, 0x8badf00d},
+{0x00000000, 0x00000000, 0x00000000, 0x00000000},
+        {0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff},
+        {0x55555555, 0xaaaaaaaa, 0x33333333, 0xcccccccc},
+        {0x12345678, 0x9abcdef0, 0x13579bdf, 0x2468ace0},
+        {0x0f1e2d3c, 0x4b5a6978, 0x8697a5b4, 0xc3d2e1f0},
+        {0x11111111, 0x22222222, 0x33333333, 0x44444444},
+        {0x99999999, 0x88888888, 0x77777777, 0x66666666},
+    };
+
+    const uint32_t pts[40][4] = {
+        {0x6bc1bee2, 0x2e409f96, 0xe93d7e11, 0x7393172a},
+        {0x00112233, 0x44556677, 0x8899aabb, 0xccddeeff},
+        {0x12345678, 0x90abcdef, 0x12345678, 0x90abcdef},
+        {0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF},
+        {0xABCDEF12, 0x34567890, 0x11223344, 0x55667788},
+        {0xCAFEBABE, 0xCAFEBABE, 0xCAFEBABE, 0xCAFEBABE},
+        {0x00000000, 0x00000000, 0x00000000, 0x00000000},
+        {0xDEADBEAF, 0xBEEFCAFE, 0xC0DEC0DE, 0xFEE1DEAD},
+        {0x11111111, 0x22222222, 0x33333333, 0x44444444},
+        {0x55555555, 0x66666666, 0x77777777, 0x88888888},
+
+        {0xabcdef01, 0x23456789, 0x87654321, 0x0fedcba9},
+        {0x01234567, 0x89abcdef, 0xfedcba98, 0x76543210},
+        {0x0f0f0f0f, 0xf0f0f0f0, 0x0f0f0f0f, 0xf0f0f0f0},
+        {0xdeadbeef, 0xbeadfeed, 0xfaceb00c, 0xcafef00d},
+        {0x11112222, 0x33334444, 0x55556666, 0x77778888},
+        {0x0000ffff, 0xffff0000, 0x00ff00ff, 0xff00ff00},
+        {0x99999999, 0x88888888, 0x77777777, 0x66666666},
+        {0x0a0a0a0a, 0x1b1b1b1b, 0x2c2c2c2c, 0x3d3d3d3d},
+        {0xabcdefab, 0xcdefabcd, 0xefabcdef, 0xfabcdefa},
+        {0x12345678, 0x9abcdef0, 0x13579bdf, 0x2468ace0},
+
+        {0x0f1e2d3c, 0x4b5a6978, 0x8697a5b4, 0xc3d2e1f0},
+        {0x11111111, 0x22222222, 0x33333333, 0x44444444},
+        {0x55555555, 0xaaaaaaaa, 0x33333333, 0xcccccccc},
+        {0xdeadbeef, 0x00000000, 0xffffffff, 0x12345678},
+        {0xabcdef01, 0x23456789, 0x87654321, 0x0fedcba9},
+        {0x11111111, 0x22222222, 0x33333333, 0x44444444},
+        {0xdeadbeef, 0xcafebabe, 0xfeedface, 0x8badf00d},
+        {0x01010101, 0x02020202, 0x03030303, 0x04040404},
+        {0x0a0b0c0d, 0x1e1f2021, 0x2a2b2c2d, 0x3e3f4041},
+        {0xabcdef12, 0x34567890, 0x11223344, 0x55667788},
+
+        {0xdeadbeef, 0xbeadfeed, 0xfaceb00c, 0xcafef00d},
+        {0x11112222, 0x33334444, 0x55556666, 0x77778888},
+        {0x00000000, 0x00000000, 0x00000000, 0x00000000},
+        {0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff},
+        {0x55555555, 0xaaaaaaaa, 0x33333333, 0xcccccccc},
+        {0x12345678, 0x9abcdef0, 0x13579bdf, 0x2468ace0},
+        {0x0f1e2d3c, 0x4b5a6978, 0x8697a5b4, 0xc3d2e1f0},
+        {0x99999999, 0x88888888, 0x77777777, 0x66666666},
+        {0x01020304, 0x05060708, 0x090a0b0c, 0x0d0e0f10},
+        {0xabcdef01, 0x23456789, 0x87654321, 0x0fedcba9}
+    };
+
+    uint32_t ct[4];
+    int i, j;
+
+    printf("=== AES-128 Multiple Test Cases ===\n\n");
+
+    for (i = 0; i < 40; ++i) {
+        printf("Test Case %d:\n", i + 1);
+        aes_encrypt(keys[i], pts[i], ct);
+        for (j = 0; j < 4; ++j)
+            printf("%08x ", keys[i][j]);
+        printf("\n");
+
+        printf("Plaintext: ");
+        for (j = 0; j < 4; ++j)
+            printf("%08x ", pts[i][j]);
+        printf("\n");
+
+        printf("Ciphertext:");
+        for (j = 0; j < 4; ++j)
+            printf("%08x ", ct[j]);
+        printf("\n\n");
+    }
+
+    printf("All test cases completed.\n");
+
+    return 0;
+}
