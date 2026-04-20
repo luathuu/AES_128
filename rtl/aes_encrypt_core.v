@@ -18,12 +18,8 @@ module aes_encrypt_core (
     input  wire [127:0] round_key9,
     input  wire [127:0] round_key10,
     output reg  [127:0] ciphertext,
-    output reg          done//,
-    // debug taps
-  //  output wire [127:0] dbg_state,
-  //  output wire [127:0] dbg_sb_sr,
-   // output wire [127:0] dbg_mc,
-   // output wire [3:0]   dbg_round
+    output reg          done
+  
 );
 
     // FSM states
@@ -66,10 +62,10 @@ module aes_encrypt_core (
     mix_columns u_mixcolumns(.state_in(sb_sr_reg),   .state_out(mixcolumns_out));
 
     // debug taps
-  //  assign dbg_state = state_reg;
-  //  assign dbg_sb_sr = sb_sr_reg;
-  //  assign dbg_mc    = mixcolumns_out;
-  //  assign dbg_round = round;
+    assign dbg_state = state_reg;
+    assign dbg_sb_sr = sb_sr_reg;
+   assign dbg_mc    = mixcolumns_out;
+   assign dbg_round = round;
 
     // FSM
     always @(posedge clk or posedge rst) begin
@@ -112,9 +108,11 @@ module aes_encrypt_core (
                 if (start) begin
                     state_reg   <= plaintext ^ rk[0];
                     rk_d0       <= rk[1];
+                    rk_d1       <= rk[2];
                     warmup_done <= 1'b0;
                     dem         <= 32'd0;
                     fsm_state   <= TG1;
+                    round     <= 4'd1;
                 end
             end
 				 TG1:
@@ -123,43 +121,22 @@ module aes_encrypt_core (
 			   end 
             WARMUP: begin
                 sb_sr_reg <= sb_sr_wire;
-                if (warmup_done) begin
-                    state_reg <= mixcolumns_out ^ rk_d0;
-                    rk_d0     <= rk[1];
-                    rk_d1     <= rk[2];
-                    round     <= 4'd1;
-                    fsm_state <= TG3;
-                end else begin
-                    warmup_done <= 1'b1;
-                end
-            end
-			  TG3:
-			  begin 
-			  fsm_state <=ROUND;
-			  end 
-            ROUND: begin
-                sb_sr_reg <= sb_sr_wire;
-                state_reg <= mixcolumns_out ^ rk_d0;
-
-                // shift delayed keys
-                rk_d0 <= rk_d1;
-                rk_d1 <= rk[round+1];
-
-                // two‐cycle gating
-                dem <= dem + 1;
-                if (dem[0] == 1'b0) begin
-                    if (round < 4'd9) begin
-                        round <= round + 1;
-								fsm_state <= TG3;
-                    end else begin
-                        fsm_state <= TG5;
+                fsm_state<=TG3;
                     end
-                end
-            end
-			  TG5:
-           begin 
-			  fsm_state <=FINAL;
-			  end 
+            TG3: begin 
+            state_reg <= mixcolumns_out ^ rk_d0;
+                rk_d0 <= rk_d1;
+                rk_d1 <= rk[round+2];
+                 if (round < 4'd9) begin
+                     round <= round + 1;  
+                     fsm_state<=TG1;
+                 end else if(round >= 4'd9) begin
+                fsm_state<=TG5; end
+            end 
+               TG5:
+			   begin 
+			   fsm_state <=FINAL;
+			   end   
             FINAL: begin
                 sb_sr_reg  <= sb_sr_wire;
                 ciphertext <= sb_sr_wire ^ rk[10];
